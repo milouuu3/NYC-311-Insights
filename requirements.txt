@@ -5,3 +5,5 @@ requests-cache
 retry-requests
 openmeteo-requests
 sodapy
+notebook
+matplotlib
