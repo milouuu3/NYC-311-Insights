@@ -2,30 +2,18 @@ import os
 import time
 import pandas as pd
 from sodapy import Socrata
-from dotenv import load_dotenv
 from datetime import datetime, timedelta
-
-load_dotenv()
-
-START_DATE = "2024-01-01"
-END_DATE = "2024-12-31"
-BATCH_SIZE = 30  # Fetch in monthly batches
-TIMEOUT = 60  # API timeout in seconds
-REQUEST_LIMIT = 50000  # Records per API request
-OUTPUT_DIR = "data/raw/311"
-
-COLS = [
-    "unique_key",
-    "created_date",
-    "closed_date",
-    "agency",
-    "complaint_type",
-    "descriptor",
-    "status",
-    "borough",
-    "latitude",
-    "longitude",
-]
+from config import (
+    NYC_APP_TOKEN,
+    START_DATE,
+    END_DATE,
+    NYC_311_DATASET_ID,
+    NYC_311_BATCH_SIZE,
+    NYC_311_TIMEOUT,
+    NYC_311_REQUEST_LIMIT,
+    NYC_311_OUTPUT_DIR,
+    NYC_311_COLUMNS
+)
 
 
 def split_date_batches(start_date, end_date, batch_size):
@@ -49,13 +37,13 @@ def fetch_batch(client, start_date, end_date, offset=0):
     where_clause = (
         f"created_date >= '{start_date}T00:00:00' AND created_date < '{end_date}T23:59:59'"
     )
-    select_clause = ",".join(COLS)
+    select_clause = ",".join(NYC_311_COLUMNS)
     try:
         results = client.get(
-            "erm2-nwe9",
+            NYC_311_DATASET_ID,
             select=select_clause,
             where=where_clause,
-            limit=REQUEST_LIMIT,
+            limit=NYC_311_REQUEST_LIMIT,
             offset=offset,
             order="created_date ASC",
         )
@@ -67,9 +55,9 @@ def fetch_batch(client, start_date, end_date, offset=0):
 
 def save_batch(df, start_date, end_date):
     """Save batch to CSV file."""
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(NYC_311_OUTPUT_DIR, exist_ok=True)
     filename = f"311_data_{start_date}_to_{end_date}.csv"
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    filepath = os.path.join(NYC_311_OUTPUT_DIR, filename)
 
     df.to_csv(filepath, index=False)
     print(f"Saved {len(df)} records to {filepath}")
@@ -77,13 +65,13 @@ def save_batch(df, start_date, end_date):
 
 def main():
     print(f"Fetching 311 data from {START_DATE} to {END_DATE}")
-    print(f"Output directory: {OUTPUT_DIR}")
+    print(f"Output directory: {NYC_311_OUTPUT_DIR}")
 
     # Initialize client
-    client = Socrata("data.cityofnewyork.us", os.getenv("NYC_APP_TOKEN"), timeout=TIMEOUT)
+    client = Socrata("data.cityofnewyork.us", NYC_APP_TOKEN, timeout=NYC_311_TIMEOUT)
 
     # Create batches
-    batches = split_date_batches(START_DATE, END_DATE, BATCH_SIZE)
+    batches = split_date_batches(START_DATE, END_DATE, NYC_311_BATCH_SIZE)
     print(f"Total batches to process: {len(batches)}")
 
     for i, batch in enumerate(batches, 1):
@@ -92,7 +80,7 @@ def main():
 
         # Check if file already exists
         filename = f"311_data_{start}_to_{end}.csv"
-        filepath = os.path.join(OUTPUT_DIR, filename)
+        filepath = os.path.join(NYC_311_OUTPUT_DIR, filename)
         if os.path.exists(filepath):
             print(f"[{i}/{len(batches)}] Skipping {start} to {end} - file already exists")
             continue
@@ -117,10 +105,10 @@ def main():
             print(f"  Fetched {len(results)} records (total: {len(all_results)})")
 
             # If we got less than the limit, we're done with this batch
-            if len(results) < REQUEST_LIMIT:
+            if len(results) < NYC_311_REQUEST_LIMIT:
                 break
 
-            offset += REQUEST_LIMIT
+            offset += NYC_311_REQUEST_LIMIT
             time.sleep(1)  # Be nice to the API
 
         # Save if we got data
