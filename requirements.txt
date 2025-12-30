@@ -7,3 +7,4 @@ openmeteo-requests
 sodapy
 notebook
 matplotlib
+seaborn
