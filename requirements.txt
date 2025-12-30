@@ -8,3 +8,4 @@ sodapy
 notebook
 matplotlib
 seaborn
+scikit-learn
